@@ -257,7 +257,7 @@ class PsychrometricCard extends HTMLElement {
             ...config,
             clothing_level: config.clothing_level !== undefined ? config.clothing_level : 0.5,
             metabolic_rate: config.metabolic_rate !== undefined ? config.metabolic_rate : 1.1,
-            air_velocity: config.air_velocity !== undefined ? config.air_velocity : 20,
+            air_velocity: config.air_velocity !== undefined ? config.air_velocity : (config.unit_system === 'metric' ? 0.1 : 20),
             mean_radiant_temp_offset: config.mean_radiant_temp_offset !== undefined ? parseFloat(config.mean_radiant_temp_offset) : 0,
             altitude: config.altitude !== undefined ? parseFloat(config.altitude) : 0,
             show_title: config.show_title !== undefined ? config.show_title : true,
@@ -300,7 +300,9 @@ class PsychrometricCard extends HTMLElement {
         // Resolve dynamic comfort parameters
         const clo = this.resolveParam(this._config.clothing_level, 0.5);
         const met = this.resolveParam(this._config.metabolic_rate, 1.1);
-        const vel = this.resolveParam(this._config.air_velocity, 20);
+        // air_velocity: imperial = FPM, metric = m/s; calculatePMV always expects FPM
+        const velRaw = this.resolveParam(this._config.air_velocity, this.isMetric ? 0.1 : 20);
+        const vel = this.isMetric ? velRaw / 0.00508 : velRaw; // convert m/s → FPM if metric
         this.resolvedParams = { clo, met, vel };
 
         const pressure = PsychroMath.getPressureFromAltitude(this._config.altitude, this._config.unit_system);
@@ -839,7 +841,8 @@ class PsychrometricCard extends HTMLElement {
         const upperLine = []; const lowerLine = []; const maxW = 0.018; const wStep = 0.001;
         for (let w = 0; w <= maxW; w += wStep) {
             const findT = (targetPMV) => {
-                let low = 40, high = 100;
+                // Range always in °F (internal unit); metric: -10°C to 45°C = 14°F to 113°F
+                let low = this.isMetric ? 14 : 40, high = this.isMetric ? 113 : 100;
                 for(let i=0; i<12; i++){
                     let mid = (low + high)/2;
                     let p_atm = pressure;
@@ -880,7 +883,7 @@ class PsychrometricCard extends HTMLElement {
             if (pts.length > 1) {
                 svgContent += `<path d="${lineGen(pts)}" fill="none" stroke="${wbColor}" stroke-width="0.5" stroke-dasharray="4,4" opacity="0.4" clip-path="url(#${satClipPathId})" />`;
                 const labelPt = pts[0];
-                if (labelPt) svgContent += `<text x="${labelPt.x - 3}" y="${labelPt.y - 3}" font-size="9" fill="${wbColor}" text-anchor="end" opacity="0.6">${wbVal}${this.isMetric ? '' : ''}</text>`;
+                if (labelPt) svgContent += `<text x="${labelPt.x - 3}" y="${labelPt.y - 3}" font-size="9" fill="${wbColor}" text-anchor="end" opacity="0.6">${wbVal}°${this.isMetric ? 'C' : 'F'}</text>`;
             }
         }
 
@@ -1295,9 +1298,11 @@ class PsychrometricCard extends HTMLElement {
                 const deltaDB = Math.abs(pt.db - trend.db);
                 const deltaW = Math.abs(pt.w - trend.w);
                 
-                // Threshold: > 1.5 F (0.8 C) OR > 0.001 lb/lb (1 g/kg)
+                // Threshold: > 1.5°F (0.8°C) OR > 0.001 lb/lb (1 g/kg)
                 // This prevents jitter from small sensor noise
-                if (deltaDB > 1.5 || deltaW > 0.001) { 
+                // deltaDB is always in °F internally; 1.5°F ≈ 0.8°C threshold
+                const dbThreshold = this.isMetric ? 0.8 * 1.8 : 1.5; // convert C threshold to F
+                if (deltaDB > dbThreshold || deltaW > 0.001) { 
                     const mag = Math.hypot(vx, vy);
                     const angleDeg = Math.atan2(vy, vx) * (180 / Math.PI);
                     const arrDist = 12; 
