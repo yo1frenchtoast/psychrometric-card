@@ -254,3 +254,26 @@ The green box labeled "comfort zone" in the screenshots shown above is rendered 
 | 2.00+ | Working out |
 
 You can set these as fixed values or wire them to Home Assistant input sensors for dynamic comfort modeling — e.g. different clothing levels by season, motion sensors to detect activity, presence-based metabolic rate, etc. Just add the sensor entity ID to the corresponding yaml config option.
+
+## Localization
+
+The card supports multiple languages via the `language` config option. All abbreviations in point tooltips, axis labels, and UI text will be translated.
+
+```yaml
+type: custom:psychrometric-card
+unit_system: metric
+language: fr
+points:
+  - ...
+```
+
+| Language | Code | DB | WB | DP | RH |
+|:---------|:-----|:---|:---|:---|:---|
+| English  | `en` | DB | WB | DP | RH |
+| Français | `fr` | BS | BH | PR | HR |
+| Deutsch  | `de` | TT | FT | TP | rF |
+| Español  | `es` | TB | TBH | PR | HR |
+
+`language` defaults to `en` if not set. `unit_system` and `language` are independent — you can use `fr` with imperial units or `en` with metric.
+
+Want to add your language? The `I18N` object at the top of `psychrometric-card.js` is the only place to edit — add a new key with your translations and submit a PR.
