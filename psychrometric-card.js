@@ -1113,9 +1113,10 @@ class PsychrometricCard extends HTMLElement {
                 maxH = Math.ceil(maxH / step) * step;
                 if (minH === maxH) { minH -= step; maxH += step; }
 
-                const graphH = tH - titleOffset;
+                const xLabelSpace = 15;
+                const graphH = tH - titleOffset - xLabelSpace;
                 const scaleTX = (t) => ((t - minTime) / (maxTime - minTime)) * tW;
-                const scaleTY = (h) => (graphH - ((h - minH) / (maxH - minH)) * graphH) + titleOffset; 
+                const scaleTY = (h) => (graphH - ((h - minH) / (maxH - minH)) * graphH) + titleOffset;
                 const trendGen = (data) => {
                     if (data.length === 0) return '';
                     const d = data.map((pt, i) => `${i===0?'M':'L'} ${scaleTX(pt.time.getTime()).toFixed(1)},${scaleTY(pt.value).toFixed(1)}`).join(' ');
@@ -1138,10 +1139,35 @@ class PsychrometricCard extends HTMLElement {
                 this.enthalpyHistory.forEach(series => {
                     seriesPaths += `<path d="${trendGen(series.data)}" fill="none" stroke="${series.color}" stroke-width="2" />`;
                 });
-                
+
+                // X-axis (hours-ago) labels: -Hh on the left, 0h on the right
+                const spanHrs = this._config.enthalpy_trend_hours;
+                let xStep;
+                if (spanHrs <= 6) xStep = 2;
+                else if (spanHrs <= 12) xStep = 3;
+                else if (spanHrs <= 24) xStep = 6;
+                else if (spanHrs <= 48) xStep = 12;
+                else xStep = Math.max(1, Math.round(spanHrs / 5));
+
+                const xLabelY = tH - 4;
+                const tickY1 = titleOffset + graphH;
+                const tickY2 = tickY1 + 4;
+                let hourLabels = '';
+                let xTicks = '';
+                for (let k = 0; k <= spanHrs + 0.001; k += xStep) {
+                    const x = tW * (1 - k / spanHrs);
+                    let anchor = 'middle';
+                    if (k === 0) anchor = 'end';
+                    else if (k >= spanHrs) anchor = 'start';
+                    const label = k === 0 ? '0h' : `-${k}h`;
+                    hourLabels += `<text x="${x.toFixed(1)}" y="${xLabelY}" font-size="10" fill="${axisColor}" text-anchor="${anchor}">${label}</text>`;
+                    xTicks += `<line x1="${x.toFixed(1)}" y1="${tickY1}" x2="${x.toFixed(1)}" y2="${tickY2}" stroke="${axisColor}" stroke-width="0.5" />`;
+                }
+
                 trendLines += `<g mask="url(#${maskId})">${gridLines}</g>`;
                 trendLines += `<g mask="url(#${maskId})">${seriesPaths}</g>`;
                 trendLines += gridLabels;
+                trendLines += `<g mask="url(#${maskId})">${xTicks}${hourLabels}</g>`;
             }
             
             trendSvg += `<g transform="translate(${tX}, ${tY})">${trendLines}</g>`;
